@@ -21,9 +21,9 @@ if [ ! -f "$ROBOTOPS_ROOT/gateway/main.py" ]; then
     exit 1
 fi
 
-mkdir -p "$OVERLAY/opt/robotops/robotops-client" "$OVERLAY/opt/robotops/state"
 rsync -a --delete "$SCRIPT_DIR/overlay/" "$OVERLAY/"
 cp "$SCRIPT_DIR/kernel.fragment" "$KERNEL_FRAGMENT"
+mkdir -p "$OVERLAY/opt/robotops/robotops-client" "$OVERLAY/opt/robotops/state"
 rsync -a --delete \
     --exclude '__pycache__/' \
     --exclude '*.pyc' \
