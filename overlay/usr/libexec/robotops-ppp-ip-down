@@ -1,0 +1,5 @@
+#!/bin/sh
+
+[ "${6:-}" = "robotops-cellular" ] || exit 0
+logger -t robotops-cellular "PPP link is down on $1" 2>/dev/null || true
+exit 0

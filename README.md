@@ -42,6 +42,14 @@ overlay to:
 board/rockchip/rk3506/robotops-overlay
 ```
 
+Append the installed kernel fragment to the existing kernel fragment list:
+
+```text
+board/rockchip/rk3506/robotops-kernel.fragment
+```
+
+Do not replace any fragment already configured by the vendor defconfig.
+
 Build and package:
 
 ```sh
@@ -79,9 +87,10 @@ kernel, device-tree, or partition-table trimming.
 
 The Lyra Plus vendor image starts `udhcpc -i eth0` from `S60netdevice`. The
 RobotOps supervisor keeps that behavior and adds a fallback DHCP client only
-when no existing `udhcpc` process owns `eth0`. RobotOps does not start until
-`eth0` has an IPv4 address and a default route. The USB management interface
-remains independent at `192.168.123.100/24`.
+when no existing `udhcpc` process owns `eth0`. RobotOps starts when either
+wired Ethernet or the cellular interface has a global IPv4 address and a
+default route. The USB management interface remains independent at
+`192.168.123.100/24`.
 
 Verify the first boot with:
 
@@ -92,3 +101,42 @@ cat /etc/resolv.conf
 ps w | grep '[u]dhcpc'
 ping -c 1 192.168.3.1
 ```
+
+## EG800K cellular link
+
+The default cellular transport is UART PPP. UART0 remains the 1,500,000 baud
+debug console; the modem defaults to `/dev/ttyS1` at 115200 baud with the
+`CMNET` APN. On the target, enable UART1 and select the PCB-routed TX/RX pins
+with `luckfox-config`, then reboot and verify that `/dev/ttyS1` exists.
+The default is two-wire UART (`CELLULAR_UART_FLOW_CONTROL=none`). If MAIN_RTS
+and MAIN_CTS are routed through the required level translation, set it to
+`hardware` for more reliable sustained traffic.
+
+Settings are in `/etc/default/robotops-cellular`. Ethernet remains the preferred
+uplink; PPP installs a default route with metric 900 and therefore acts as the
+fallback when both links are present.
+
+```sh
+cat /etc/default/robotops-cellular
+/etc/init.d/S70robotops-cellular restart
+ip -4 addr show dev ppp0
+ip route show default
+logread | grep -E 'pppd|robotops-cellular'
+```
+
+The kernel also includes USB ECM/NCM networking and Quectel-compatible USB
+serial support. To test the reserved USB route later, set
+`CELLULAR_MODE=usb-ecm` and set `CELLULAR_USB_INTERFACE` to the interface name
+reported by `ip link`. The USB mode is available but is not selected by default.
+
+The PCB may also route the module MAIN UART, AUX UART, and USB concurrently.
+The Linux profile reserves `/dev/ttyS2` for AUX at 115200 baud but leaves
+`CELLULAR_AUX_ENABLE=0`, so no service opens it. Enable UART2 with
+`luckfox-config` only after its pins are finalized.
+
+Do not rely on AUX for AT control until the exact module hardware and firmware
+are verified. Quectel's EC800K/EG800K QuecOpen hardware note says AUX UART is a
+peripheral channel and specifically lists AUX support for EC800K-CN and
+EG800K-EU, not EG800K-CN. The current `EG800KCNGCR07A06M04` unit should
+therefore be treated as MAIN-UART-only for PPP and AT commands during initial
+bring-up; the AUX traces remain a useful PCB reservation.

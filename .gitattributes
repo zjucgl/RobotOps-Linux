@@ -1,4 +1,7 @@
 * text=auto
 *.sh text eol=lf
+*.fragment text eol=lf
+overlay/etc/default/* text eol=lf
 overlay/etc/init.d/* text eol=lf
+overlay/usr/libexec/* text eol=lf
 overlay/usr/sbin/* text eol=lf

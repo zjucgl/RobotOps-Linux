@@ -1,0 +1,14 @@
+#!/bin/sh
+
+[ "${6:-}" = "robotops-cellular" ] || exit 0
+
+logger -t robotops-cellular "PPP link is up on $1" 2>/dev/null || true
+
+# Keep wired DHCP DNS when Ethernet is active. Otherwise expose peer DNS.
+if ! ip route show default 2>/dev/null | grep -v "dev $1" | grep -q '^default'; then
+    if [ -s /etc/ppp/resolv.conf ]; then
+        cp /etc/ppp/resolv.conf /etc/resolv.conf
+    fi
+fi
+
+exit 0

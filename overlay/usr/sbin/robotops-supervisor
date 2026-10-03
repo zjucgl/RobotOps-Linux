@@ -14,6 +14,7 @@ DEFAULTS=/etc/default/robotops
 : "${ROBOTOPS_NTP_SERVERS:=pool.ntp.org}"
 : "${ROBOTOPS_WIRED_IFACE:=eth0}"
 : "${ROBOTOPS_REQUIRE_DEFAULT_ROUTE:=1}"
+: "${ROBOTOPS_UPLINK_MODE:=any}"
 
 child_pid=
 
@@ -43,10 +44,18 @@ sync_clock() {
     return 1
 }
 
-wired_network_is_ready() {
-    ip -4 addr show dev "$ROBOTOPS_WIRED_IFACE" 2>/dev/null | grep -q 'inet ' || return 1
+network_is_ready() {
+    if [ "$ROBOTOPS_UPLINK_MODE" = "wired" ]; then
+        ip -4 addr show dev "$ROBOTOPS_WIRED_IFACE" 2>/dev/null | grep -q 'inet ' || return 1
+    else
+        ip -4 addr show scope global 2>/dev/null | grep -q 'inet ' || return 1
+    fi
     if [ "$ROBOTOPS_REQUIRE_DEFAULT_ROUTE" = "1" ]; then
-        ip route show default 2>/dev/null | grep -q "dev $ROBOTOPS_WIRED_IFACE"
+        if [ "$ROBOTOPS_UPLINK_MODE" = "wired" ]; then
+            ip route show default 2>/dev/null | grep -q "dev $ROBOTOPS_WIRED_IFACE"
+        else
+            ip route show default 2>/dev/null | grep -q '^default'
+        fi
     fi
 }
 
@@ -64,8 +73,8 @@ ensure_wired_dhcp() {
 
 mkdir -p "$ROBOTOPS_STATE_DIR" "$(dirname "$ROBOTOPS_LOG_FILE")"
 
-while ! wired_network_is_ready; do
-    log "waiting for wired DHCP on $ROBOTOPS_WIRED_IFACE"
+while ! network_is_ready; do
+    log "waiting for an uplink; checking wired DHCP on $ROBOTOPS_WIRED_IFACE"
     ensure_wired_dhcp || true
     sleep 5
 done

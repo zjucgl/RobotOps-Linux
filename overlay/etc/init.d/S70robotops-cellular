@@ -1,0 +1,32 @@
+#!/bin/sh
+
+NAME=robotops-cellular
+DAEMON=/usr/sbin/robotops-cellular-manager
+PIDFILE=/run/$NAME.pid
+
+start() {
+    [ -x "$DAEMON" ] || return 0
+    [ -r /etc/default/robotops-cellular ] && . /etc/default/robotops-cellular
+    [ "${CELLULAR_ENABLE:-0}" = "1" ] || return 0
+    [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && return 0
+
+    echo "Starting $NAME"
+    "$DAEMON" >/dev/null 2>&1 &
+    echo $! >"$PIDFILE"
+}
+
+stop() {
+    if [ -s "$PIDFILE" ]; then
+        pid=$(cat "$PIDFILE")
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        rm -f "$PIDFILE"
+    fi
+}
+
+case "${1:-}" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 2 ;;
+esac

@@ -1,0 +1,130 @@
+#!/bin/sh
+set -u
+
+DEFAULTS=/etc/default/robotops-cellular
+[ -r "$DEFAULTS" ] && . "$DEFAULTS"
+
+: "${CELLULAR_ENABLE:=0}"
+: "${CELLULAR_MODE:=uart-ppp}"
+: "${CELLULAR_UART_DEVICE:=/dev/ttyS1}"
+: "${CELLULAR_UART_BAUD:=115200}"
+: "${CELLULAR_UART_FLOW_CONTROL:=none}"
+: "${CELLULAR_APN:=CMNET}"
+: "${CELLULAR_DIAL_NUMBER:=*99***1#}"
+: "${CELLULAR_ROUTE_METRIC:=900}"
+: "${CELLULAR_USB_INTERFACE:=wwan0}"
+
+log() {
+    logger -t robotops-cellular "$*" 2>/dev/null || echo "$*" >/dev/console
+}
+
+valid_token() {
+    case "$1" in
+        *[!A-Za-z0-9._:/#*+-]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+start_uart_ppp() {
+    command -v pppd >/dev/null 2>&1 || {
+        log "pppd is not installed"
+        exit 1
+    }
+    valid_token "$CELLULAR_UART_DEVICE" && valid_token "$CELLULAR_UART_BAUD" && \
+        valid_token "$CELLULAR_APN" && valid_token "$CELLULAR_DIAL_NUMBER" && \
+        valid_token "$CELLULAR_ROUTE_METRIC" || {
+        log "invalid cellular setting"
+        exit 1
+    }
+
+    while [ ! -c "$CELLULAR_UART_DEVICE" ]; do
+        log "waiting for modem UART $CELLULAR_UART_DEVICE"
+        sleep 10
+    done
+
+    mkdir -p /run/robotops-cellular /var/lock
+    chat_file=/run/robotops-cellular/chat
+    peer_file=/run/robotops-cellular/peer
+
+    case "$CELLULAR_UART_FLOW_CONTROL" in
+        hardware) flow_control=crtscts ;;
+        none) flow_control=nocrtscts ;;
+        *) log "invalid UART flow-control setting"; exit 1 ;;
+    esac
+
+    cat >"$chat_file" <<EOF
+ABORT 'BUSY'
+ABORT 'NO CARRIER'
+ABORT 'NO DIALTONE'
+ABORT 'ERROR'
+TIMEOUT 10
+'' AT
+OK ATE0
+OK AT+CGDCONT=1,"IP","$CELLULAR_APN"
+OK ATD$CELLULAR_DIAL_NUMBER
+CONNECT ''
+EOF
+
+    cat >"$peer_file" <<EOF
+$CELLULAR_UART_DEVICE
+$CELLULAR_UART_BAUD
+$flow_control
+connect "/usr/sbin/chat -v -f $chat_file"
+noauth
+noipdefault
+ipcp-accept-local
+ipcp-accept-remote
+defaultroute
+defaultroute-metric $CELLULAR_ROUTE_METRIC
+usepeerdns
+persist
+maxfail 0
+holdoff 10
+linkname robotops-cellular
+ipparam robotops-cellular
+ip-up-script /usr/libexec/robotops-ppp-ip-up
+ip-down-script /usr/libexec/robotops-ppp-ip-down
+noipv6
+novj
+nobsdcomp
+nodeflate
+noccp
+EOF
+
+    chmod 0600 "$chat_file" "$peer_file"
+    log "starting UART PPP on $CELLULAR_UART_DEVICE"
+    exec pppd file "$peer_file" nodetach
+}
+
+start_usb_ecm() {
+    command -v udhcpc >/dev/null 2>&1 || {
+        log "udhcpc is not installed"
+        exit 1
+    }
+    valid_token "$CELLULAR_USB_INTERFACE" || {
+        log "invalid USB interface setting"
+        exit 1
+    }
+
+    while :; do
+        if ip link show "$CELLULAR_USB_INTERFACE" >/dev/null 2>&1; then
+            ip link set "$CELLULAR_USB_INTERFACE" up 2>/dev/null || true
+            if ! ps w 2>/dev/null | grep '[u]dhcpc' | grep -q -- "-i $CELLULAR_USB_INTERFACE"; then
+                log "starting DHCP on USB modem interface $CELLULAR_USB_INTERFACE"
+                udhcpc -b -i "$CELLULAR_USB_INTERFACE" \
+                    -p "/run/udhcpc-$CELLULAR_USB_INTERFACE.pid" \
+                    -s /usr/share/udhcpc/default.script >/dev/null 2>&1 || true
+            fi
+        else
+            log "waiting for USB modem interface $CELLULAR_USB_INTERFACE"
+        fi
+        sleep 10
+    done
+}
+
+[ "$CELLULAR_ENABLE" = "1" ] || exit 0
+case "$CELLULAR_MODE" in
+    uart-ppp) start_uart_ppp ;;
+    usb-ecm) start_usb_ecm ;;
+    *) log "unsupported cellular mode: $CELLULAR_MODE"; exit 1 ;;
+esac
