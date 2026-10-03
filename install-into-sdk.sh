@@ -24,12 +24,10 @@ fi
 rsync -a --delete "$SCRIPT_DIR/overlay/" "$OVERLAY/"
 cp "$SCRIPT_DIR/kernel.fragment" "$KERNEL_FRAGMENT"
 mkdir -p "$OVERLAY/opt/robotops/robotops-client" "$OVERLAY/opt/robotops/state"
-rsync -a --delete \
-    --exclude '__pycache__/' \
-    --exclude '*.pyc' \
-    --exclude '*.pem' \
-    --exclude '*.key' \
-    --exclude '*.zip' \
+rsync -a --delete --delete-excluded \
+    --include '*/' \
+    --include '*.py' \
+    --exclude '*' \
     "$ROBOTOPS_ROOT/gateway/" "$OVERLAY/opt/robotops/robotops-client/gateway/"
 
 python3 -m pip install \
