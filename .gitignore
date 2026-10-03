@@ -1,0 +1,7 @@
+*.img
+*.key
+*.pem
+*-cert.zip
+output/
+rockdev/
+sdk/

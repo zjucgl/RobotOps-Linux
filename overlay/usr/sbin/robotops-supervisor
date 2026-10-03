@@ -1,0 +1,73 @@
+#!/bin/sh
+set -u
+
+DEFAULTS=/etc/default/robotops
+[ -r "$DEFAULTS" ] && . "$DEFAULTS"
+
+: "${ROBOTOPS_APP_DIR:=/opt/robotops/robotops-client}"
+: "${ROBOTOPS_CONFIG:=/etc/robotops/gateway.json}"
+: "${ROBOTOPS_STATE_DIR:=/opt/robotops/state}"
+: "${ROBOTOPS_LOG_FILE:=/var/log/robotops-client.log}"
+: "${ROBOTOPS_HEARTBEAT_INTERVAL:=60}"
+: "${ROBOTOPS_QUEUE_MAX_MIB:=16}"
+: "${ROBOTOPS_RESTART_DELAY:=5}"
+: "${ROBOTOPS_NTP_SERVERS:=pool.ntp.org}"
+
+child_pid=
+
+stop_child() {
+    if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
+        kill "$child_pid" 2>/dev/null || true
+        wait "$child_pid" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+trap stop_child INT TERM
+
+log() {
+    logger -t robotops-supervisor "$*" 2>/dev/null || echo "$*" >/dev/console
+}
+
+clock_is_valid() {
+    [ "$(date +%s)" -ge 1704067200 ]
+}
+
+sync_clock() {
+    command -v ntpd >/dev/null 2>&1 || return 1
+    for server in $ROBOTOPS_NTP_SERVERS; do
+        ntpd -q -p "$server" >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+
+mkdir -p "$ROBOTOPS_STATE_DIR" "$(dirname "$ROBOTOPS_LOG_FILE")"
+
+while ! clock_is_valid; do
+    log "waiting for a valid system clock"
+    sync_clock || true
+    sleep 10
+done
+
+while [ ! -r "$ROBOTOPS_CONFIG" ]; do
+    log "waiting for configuration: $ROBOTOPS_CONFIG"
+    sleep 10
+done
+
+export PYTHONPATH="$ROBOTOPS_APP_DIR/vendor:$ROBOTOPS_APP_DIR"
+
+while :; do
+    cd "$ROBOTOPS_APP_DIR" || exit 1
+    /usr/bin/python3 -u -m gateway.main \
+        --config "$ROBOTOPS_CONFIG" \
+        --state-dir "$ROBOTOPS_STATE_DIR" \
+        --heartbeat-interval "$ROBOTOPS_HEARTBEAT_INTERVAL" \
+        --queue-max-mib "$ROBOTOPS_QUEUE_MAX_MIB" \
+        >>"$ROBOTOPS_LOG_FILE" 2>&1 &
+    child_pid=$!
+    wait "$child_pid"
+    status=$?
+    child_pid=
+    log "robotops-client exited with status $status; restarting"
+    sleep "$ROBOTOPS_RESTART_DELAY"
+done

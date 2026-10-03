@@ -1,0 +1,34 @@
+#!/bin/sh
+
+PID_FILE=/run/robotops-supervisor.pid
+DAEMON=/usr/sbin/robotops-supervisor
+
+start() {
+    printf 'Starting robotops-client: '
+    start-stop-daemon -S -b -m -p "$PID_FILE" -x "$DAEMON"
+    result=$?
+    [ "$result" -eq 0 ] && echo OK || echo FAIL
+    return "$result"
+}
+
+stop() {
+    printf 'Stopping robotops-client: '
+    start-stop-daemon -K -o -p "$PID_FILE"
+    result=$?
+    rm -f "$PID_FILE"
+    [ "$result" -eq 0 ] && echo OK || echo FAIL
+    return "$result"
+}
+
+case "${1:-}" in
+    start) start ;;
+    stop) stop ;;
+    restart|reload)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac

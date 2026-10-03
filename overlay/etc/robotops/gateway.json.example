@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "cfg_id": "gateway_only",
+  "version": "0.1.0",
+  "gw_id": "REPLACE_WITH_CERTIFICATE_CN",
+  "robot_id": "REPLACE_WITH_ASSET_SN",
+  "site": "REPLACE_WITH_SITE",
+  "device": {
+    "vendor": "unconfigured",
+    "model": "unconfigured",
+    "protocol": "disabled",
+    "host": "127.0.0.1",
+    "port": 502,
+    "unit": 1
+  },
+  "groups": [],
+  "mqtt": {
+    "host": "mqtt.robot.aigcit.com",
+    "port": 8883,
+    "client_id": "REPLACE_WITH_CERTIFICATE_CN",
+    "keepalive_s": 60,
+    "batch_size": 20,
+    "tls": {
+      "ca": "/etc/robotops/certs/ca-chain.pem",
+      "cert": "/etc/robotops/certs/cert.pem",
+      "key": "/etc/robotops/certs/key.pem",
+      "insecure": false
+    }
+  }
+}
