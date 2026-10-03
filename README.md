@@ -71,7 +71,7 @@ tail -f /var/log/robotops-client.log
 ```
 
 The supervisor waits for a post-2024 system clock before starting RobotOps,
-uses a 16 MiB queue limit, and restarts the process after failures. The first
+uses an 8 MiB queue limit, and restarts the process after failures. The first
 image should be tested from a recoverable Loader/MaskRom setup before any
 kernel, device-tree, or partition-table trimming.
 
