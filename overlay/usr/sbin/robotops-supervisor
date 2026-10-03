@@ -12,6 +12,8 @@ DEFAULTS=/etc/default/robotops
 : "${ROBOTOPS_QUEUE_MAX_MIB:=16}"
 : "${ROBOTOPS_RESTART_DELAY:=5}"
 : "${ROBOTOPS_NTP_SERVERS:=pool.ntp.org}"
+: "${ROBOTOPS_WIRED_IFACE:=eth0}"
+: "${ROBOTOPS_REQUIRE_DEFAULT_ROUTE:=1}"
 
 child_pid=
 
@@ -41,7 +43,32 @@ sync_clock() {
     return 1
 }
 
+wired_network_is_ready() {
+    ip -4 addr show dev "$ROBOTOPS_WIRED_IFACE" 2>/dev/null | grep -q 'inet ' || return 1
+    if [ "$ROBOTOPS_REQUIRE_DEFAULT_ROUTE" = "1" ]; then
+        ip route show default 2>/dev/null | grep -q "dev $ROBOTOPS_WIRED_IFACE"
+    fi
+}
+
+wired_dhcp_is_running() {
+    ps w 2>/dev/null | grep '[u]dhcpc' | grep -q -- "-i $ROBOTOPS_WIRED_IFACE"
+}
+
+ensure_wired_dhcp() {
+    ip link set "$ROBOTOPS_WIRED_IFACE" up 2>/dev/null || return 1
+    wired_dhcp_is_running && return 0
+    udhcpc -b -i "$ROBOTOPS_WIRED_IFACE" \
+        -p "/run/udhcpc-$ROBOTOPS_WIRED_IFACE.pid" \
+        -s /usr/share/udhcpc/default.script >/dev/null 2>&1 &
+}
+
 mkdir -p "$ROBOTOPS_STATE_DIR" "$(dirname "$ROBOTOPS_LOG_FILE")"
+
+while ! wired_network_is_ready; do
+    log "waiting for wired DHCP on $ROBOTOPS_WIRED_IFACE"
+    ensure_wired_dhcp || true
+    sleep 5
+done
 
 while ! clock_is_valid; do
     log "waiting for a valid system clock"

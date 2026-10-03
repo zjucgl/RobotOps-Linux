@@ -74,3 +74,21 @@ The supervisor waits for a post-2024 system clock before starting RobotOps,
 uses a 16 MiB queue limit, and restarts the process after failures. The first
 image should be tested from a recoverable Loader/MaskRom setup before any
 kernel, device-tree, or partition-table trimming.
+
+## Wired DHCP
+
+The Lyra Plus vendor image starts `udhcpc -i eth0` from `S60netdevice`. The
+RobotOps supervisor keeps that behavior and adds a fallback DHCP client only
+when no existing `udhcpc` process owns `eth0`. RobotOps does not start until
+`eth0` has an IPv4 address and a default route. The USB management interface
+remains independent at `192.168.123.100/24`.
+
+Verify the first boot with:
+
+```sh
+ip -4 addr show dev eth0
+ip route show default
+cat /etc/resolv.conf
+ps w | grep '[u]dhcpc'
+ping -c 1 192.168.3.1
+```
