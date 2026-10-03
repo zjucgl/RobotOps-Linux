@@ -102,7 +102,10 @@ ps w | grep '[u]dhcpc'
 ping -c 1 192.168.3.1
 ```
 
-## EG800K cellular link
+## EC800K-CN cellular link
+
+The installed module is Quectel EC800K-CN, variant EC800KCNLC. It has no
+built-in GNSS.
 
 The default cellular transport is UART PPP. UART0 remains the 1,500,000 baud
 debug console; the modem defaults to `/dev/ttyS1` at 115200 baud with the
@@ -129,14 +132,9 @@ serial support. To test the reserved USB route later, set
 `CELLULAR_MODE=usb-ecm` and set `CELLULAR_USB_INTERFACE` to the interface name
 reported by `ip link`. The USB mode is available but is not selected by default.
 
-The PCB may also route the module MAIN UART, AUX UART, and USB concurrently.
-The Linux profile reserves `/dev/ttyS2` for AUX at 115200 baud but leaves
-`CELLULAR_AUX_ENABLE=0`, so no service opens it. Enable UART2 with
-`luckfox-config` only after its pins are finalized.
-
-Do not rely on AUX for AT control until the exact module hardware and firmware
-are verified. Quectel's EC800K/EG800K QuecOpen hardware note says AUX UART is a
-peripheral channel and specifically lists AUX support for EC800K-CN and
-EG800K-EU, not EG800K-CN. The current `EG800KCNGCR07A06M04` unit should
-therefore be treated as MAIN-UART-only for PPP and AT commands during initial
-bring-up; the AUX traces remain a useful PCB reservation.
+The PCB reserves the module's AUX UART and USB connections. The Linux profile
+reserves `/dev/ttyS2` for AUX at 115200 baud, but
+`CELLULAR_AUX_ENABLE=0` and no background service opens it. Enable UART2 with
+`luckfox-config` only after its pins are finalized. Treat AUX as a hardware
+reservation until the exact EC800KCNLC firmware and PCB wiring are verified;
+do not assume that it provides a parallel AT channel while MAIN UART runs PPP.
