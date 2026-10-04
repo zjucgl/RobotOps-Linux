@@ -19,6 +19,11 @@ Build the unmodified vendor image once before applying this profile.
 
 ## Stage RobotOps
 
+Use `zjucgl/robotops-client` commit `6975a35` or newer. That baseline adds the
+8 MiB queue option plus no-SQLite and no-Pydantic fallbacks expected by this
+profile. The implemented scope, remaining work, and release acceptance criteria
+are maintained in [the Lyra Plus lite gateway requirements](https://github.com/zjucgl/robotops-client/blob/main/docs/luckfox-lyra-lite-gateway.md).
+
 Keep the Lyra SDK, this repository, and `robotops-client` as separate source
 trees. From this repository, run:
 
